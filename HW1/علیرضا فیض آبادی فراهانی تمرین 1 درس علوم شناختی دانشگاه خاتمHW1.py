@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import io
 import os
 import cv2
+import pandas as pd
+import seaborn as sns
+from scipy import stats
 
 # Define paths (replace with your actual paths)
 mat_file_path = "C:\\Users\\Lenovo\\Desktop\\S01.mat"  # Path to the S01.mat file
@@ -174,3 +177,86 @@ print(f"Enhanced video saved to: {output_video_path}")
 heatmap_final = cv2.applyColorMap((cv2.GaussianBlur(heatmap, (21, 21), heatmap_sigma) * 255).astype(np.uint8), 
                                  cv2.COLORMAP_HOT)  # Changed to HOT colormap
 cv2.imwrite("gaze_heatmap.png", heatmap_final)
+
+# Function to load subject data
+def load_subject_data(subject_id):
+    mat_file_path = f"C:\\Users\\Lenovo\\Desktop\\S{subject_id:02d}.mat"
+    mat_data = scipy.io.loadmat(mat_file_path)
+    subject_data = mat_data[f'S{subject_id:02d}']
+    et_clean = subject_data['ET_clean']
+    et_data = et_clean[0, 0][0, 0]
+    return et_data
+
+def analyze_fixations(et_data, product_info):
+    # Extract fixation data
+    fixations = et_data[0]  # Assuming first two rows are x,y coordinates
+    bought_indices = product_info['bought_indices']
+    
+    # Separate fixations for bought vs non-bought products
+    bought_fixations = fixations[:, bought_indices]
+    nonbought_fixations = fixations[:, ~bought_indices]
+    
+    # Calculate metrics
+    metrics = {
+        'bought': {
+            'count': bought_fixations.shape[1],
+            'total_duration': np.sum(~np.isnan(bought_fixations[0, :])),
+            'mean_pupil_size': np.nanmean(bought_fixations[2, :]) if bought_fixations.shape[0] > 2 else None
+        },
+        'nonbought': {
+            'count': nonbought_fixations.shape[1],
+            'total_duration': np.sum(~np.isnan(nonbought_fixations[0, :])),
+            'mean_pupil_size': np.nanmean(nonbought_fixations[2, :]) if nonbought_fixations.shape[0] > 2 else None
+        }
+    }
+    
+    return metrics
+
+def plot_comparison(metrics_list, metric_name, title):
+    bought_data = [m['bought'][metric_name] for m in metrics_list]
+    nonbought_data = [m['nonbought'][metric_name] for m in metrics_list]
+    
+    plt.figure(figsize=(10, 6))
+    plt.boxplot([bought_data, nonbought_data], labels=['Bought', 'Non-bought'])
+    plt.title(title)
+    plt.ylabel(metric_name.replace('_', ' ').title())
+    
+    # Perform t-test
+    t_stat, p_val = stats.ttest_ind(bought_data, nonbought_data)
+    plt.text(0.5, 0.95, f'p-value: {p_val:.3f}', 
+             horizontalalignment='center',
+             transform=plt.gca().transAxes)
+    
+    plt.show()
+
+# Analyze multiple subjects
+subjects = ['01', '02', '03', '04']
+all_metrics = []
+
+for subject_id in subjects:
+    try:
+        et_data = load_subject_data(subject_id)
+        # Mock product info - replace with actual product purchase data
+        product_info = {
+            'bought_indices': np.random.choice([True, False], et_data[0].shape[1])
+        }
+        metrics = analyze_fixations(et_data, product_info)
+        all_metrics.append(metrics)
+        print(f"Processed subject {subject_id}")
+    except Exception as e:
+        print(f"Error processing subject {subject_id}: {str(e)}")
+
+# Generate plots
+plot_comparison(all_metrics, 'count', 'Number of Fixations')
+plot_comparison(all_metrics, 'total_duration', 'Total Fixation Duration')
+plot_comparison(all_metrics, 'mean_pupil_size', 'Mean Pupil Size')
+
+# Statistical analysis
+print("\nStatistical Analysis:")
+for metric in ['count', 'total_duration', 'mean_pupil_size']:
+    bought_data = [m['bought'][metric] for m in all_metrics]
+    nonbought_data = [m['nonbought'][metric] for m in all_metrics]
+    t_stat, p_val = stats.ttest_ind(bought_data, nonbought_data)
+    print(f"\n{metric.replace('_', ' ').title()}:")
+    print(f"t-statistic: {t_stat:.3f}")
+    print(f"p-value: {p_val:.3f}")

@@ -1,0 +1,11 @@
+Product_ID,Bought_Status,Fixation_Count,Total_Fixation_Duration
+Product1,Bought,11,1883
+Product2,NotBought,12,1435
+Product3,NotBought,8,1319
+Product4,NotBought,13,905
+Product5,NotBought,14,1582
+Product6,Bought,5,1258
+Product7,Bought,6,1043
+Product8,Bought,7,1305
+Product9,NotBought,9,1325
+Product10,Bought,12,1495
